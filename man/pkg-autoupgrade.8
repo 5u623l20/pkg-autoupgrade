@@ -280,9 +280,12 @@ Pending notices are written here in a delimited section.
 Persistent copy of pending notices; repopulated at boot.
 .El
 .Sh PERIODIC INTEGRATION
-Copy the sample periodic configuration and enable the daily run:
+Enable the daily run by adding the following to
+.Pa /etc/periodic.conf ,
+.Pa /etc/periodic.conf.local ,
+or
+.Pa /usr/local/etc/periodic.conf :
 .Bd -literal -offset indent
-# In /etc/periodic.conf:
 daily_pkg_autoupgrade_enable="YES"
 .Ed
 .Pp

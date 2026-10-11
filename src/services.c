@@ -48,7 +48,7 @@
 #include "services.h"
 
 #define	RC_DIR_BASE	"/etc/rc.d"
-#define	RC_DIR_LOCAL	"/usr/local/etc/rc.d"
+#define	RC_DIR_LOCAL	LOCALBASE "/etc/rc.d"
 
 /* ------------------------------------------------------------------ */
 /* Candidate set (simple dedup array) */

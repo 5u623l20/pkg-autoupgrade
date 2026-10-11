@@ -27,6 +27,7 @@ WARNS?=		6
 
 CFLAGS+=	-I${.CURDIR}/include
 CFLAGS+=	-I${LOCALBASE}/include	# dependency headers (libpkg, libbe)
+CFLAGS+=	-DLOCALBASE=\"${LOCALBASE}\"
 LDFLAGS+=	-L${LOCALBASE}/lib
 LDADD+=		-lpkg -lbe -lprocstat
 
@@ -34,7 +35,7 @@ LDADD+=		-lpkg -lbe -lprocstat
 SHLIBDIR=	${PREFIX}/lib/pkg
 
 MAN=		man/pkg-autoupgrade.8
-MANDIR=		${PREFIX}/share/man
+MANDIR=		${PREFIX}/share/man/man
 
 PERIODIC_DIR=	${PREFIX}/etc/periodic/daily
 RCDIR=		${PREFIX}/etc/rc.d
@@ -42,7 +43,7 @@ CONFDIR=	${PREFIX}/etc/pkg
 
 beforeinstall:
 	${INSTALL} -d -m 0755 ${DESTDIR}${SHLIBDIR}
-	${INSTALL} -d -m 0755 ${DESTDIR}${MANDIR}/man8
+	${INSTALL} -d -m 0755 ${DESTDIR}${MANDIR}8
 	${INSTALL} -d -m 0755 ${DESTDIR}${PERIODIC_DIR}
 	${INSTALL} -d -m 0755 ${DESTDIR}${RCDIR}
 	${INSTALL} -d -m 0755 ${DESTDIR}${CONFDIR}

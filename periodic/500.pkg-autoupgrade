@@ -4,8 +4,8 @@
 #
 # 500.pkg-autoupgrade - daily periodic hook for pkg autoupgrade.
 #
-# Controlled by periodic.conf(5) variables (set in /etc/periodic.conf
-# or /etc/periodic.conf.local):
+# Controlled by periodic.conf(5) variables (set in /etc/periodic.conf,
+# /etc/periodic.conf.local, or /usr/local/etc/periodic.conf):
 #   daily_pkg_autoupgrade_enable  - YES to run (default: NO)
 #   daily_pkg_autoupgrade_flags   - extra flags passed to pkg autoupgrade
 #                                    (currently unused; reserved)
@@ -15,6 +15,7 @@
 
 . /etc/periodic.conf 2>/dev/null
 . /etc/periodic.conf.local 2>/dev/null
+. /usr/local/etc/periodic.conf 2>/dev/null
 
 : "${daily_pkg_autoupgrade_enable:=NO}"
 

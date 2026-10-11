@@ -94,7 +94,7 @@ Copy and edit the sample config:
 vi /usr/local/etc/pkg/autoupgrade.conf
 ```
 
-Enable the daily periodic run in `/etc/periodic.conf` or `/etc/periodic.conf.local`:
+Enable the daily periodic run in `/etc/periodic.conf`, `/etc/periodic.conf.local`, or `/usr/local/etc/periodic.conf`:
 
 ```sh
 daily_pkg_autoupgrade_enable="YES"
