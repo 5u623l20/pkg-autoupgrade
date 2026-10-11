@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# SPDX-FileCopyrightText: 2026 Cybermancer Infosec B.V.
+#
+# pkg-autoupgrade plugin configuration (UCL format).
+# Copy this file to autoupgrade.conf and edit as needed.
+# A missing file is not an error; compiled-in defaults apply.
+#
+# Allow upgrading base system (pkgbase) packages.  When false, repos listed
+# in AU_BASE_REPOS are excluded from the upgrade job, preventing accidental
+# automatic kernel/world upgrades.
+AU_ALLOW_BASE_UPGRADE = false;
+
+# Comma-separated list of repository names that contain base system packages.
+# Only used when AU_ALLOW_BASE_UPGRADE = false.
+AU_BASE_REPOS = "FreeBSD-base";
+
+# Create a ZFS boot environment before each upgrade run.  On a UFS root,
+# this has no effect; see AU_UFS_KERNEL_BACKUP instead.
+AU_BE_ENABLED = true;
+
+# Prefix for auto-created boot environment names.
+# The plugin appends "-YYYYMMDDTHHmmSS" to form the full name.
+AU_BE_PREFIX = "pre-autoupgrade";
+
+# Maximum number of auto-created boot environments to retain.
+# The oldest are pruned after each run.
+AU_BE_KEEP = 5;
+
+# On a UFS root, back up /boot/kernel to /boot/kernel.old before a kernel
+# package upgrade.  The FreeBSD boot loader can boot from /boot/kernel.old
+# via "Boot Older Kernel" in the loader menu or nextboot(8).
+AU_UFS_KERNEL_BACKUP = true;
+
+# Automatically reboot after a kernel upgrade when not inside a jail.
+# If false, a notice is written to /var/run/motd instead.
+AU_ALLOW_REBOOT = false;
+
+# Comma-separated list of service names that the plugin may restart
+# automatically after the owning package is upgraded.  Services not in this
+# list receive a /var/run/motd notice instead of an automatic restart.
+#
+# Example:
+#   AU_RESTART_SERVICES = "nginx, postgresql, redis";
+AU_RESTART_SERVICES = "";
+
+# When true, only packages with known vulnerabilities (as reported by
+# pkg-audit(8)) are upgraded.  The vuln.xml database is refreshed automatically
+# before each run.  If no vulnerable packages are found the run is a no-op.
+# AU_ALLOW_BASE_UPGRADE and AU_BASE_REPOS are still respected - a vulnerable
+# base package is only upgraded if AU_ALLOW_BASE_UPGRADE is also true.
+#
+# When false (the default), all packages are eligible for upgrade.
+AU_ONLY_UPGRADE_VULNERABLE_PKG = false;
+
+# Comma-separated list of POSIX extended regular expressions.  Any package
+# whose name matches one of these patterns is excluded from the upgrade job.
+# Use pkg-lock(8) to permanently pin packages; this setting is for automated
+# runs only.
+#
+# Examples:
+#   AU_BLOCKLISTED_PACKAGES = "^php83-.*$, ^node[0-9]+$";
+AU_BLOCKLISTED_PACKAGES = "";
+
+# Remove orphaned packages (those no longer required by any installed package)
+# automatically after a successful upgrade.  Equivalent to running
+# "pkg autoremove" by hand.
+AU_AUTOREMOVE = false;
+
+# Time at which to reboot after a kernel upgrade when AU_ALLOW_REBOOT = true.
+# "now" reboots immediately (via reboot(2)).  "HH:MM" schedules the reboot via
+# shutdown(8) so that logged-in users receive advance notice.
+AU_REBOOT_TIME = "now";
+
+# When true, reboot even if interactive users are currently logged in.
+# When false (the default), a reboot is deferred and a MOTD notice is written
+# instead, so no logged-in session is dropped unexpectedly.
+AU_REBOOT_IF_USERS_LOGGED_IN = false;
+
+# Email address to send post-upgrade reports to.  Requires a working MTA
+# with a sendmail(8)-compatible interface at /usr/sbin/sendmail.
+# Leave empty (the default) to disable email notifications.
+#
+# Example:
+#   AU_MAIL_TO = "sysadmin@example.com";
+AU_MAIL_TO = "";
+
+# Controls when email reports are sent:
+#   always    - send after every run, even if nothing changed
+#   on-change - send when at least one package was upgraded (the default)
+#   on-error  - send only when an error occurred
+AU_MAIL_REPORT = "on-change";

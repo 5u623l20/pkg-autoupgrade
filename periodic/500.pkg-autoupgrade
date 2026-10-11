@@ -1,0 +1,48 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-2-Clause
+# SPDX-FileCopyrightText: 2026 Cybermancer Infosec B.V.
+#
+# 500.pkg-autoupgrade - daily periodic hook for pkg autoupgrade.
+#
+# Controlled by periodic.conf(5) variables (set in /etc/periodic.conf
+# or /etc/periodic.conf.local):
+#   daily_pkg_autoupgrade_enable  - YES to run (default: NO)
+#   daily_pkg_autoupgrade_flags   - extra flags passed to pkg autoupgrade
+#                                    (currently unused; reserved)
+
+# PROVIDE: pkg_autoupgrade
+# REQUIRE: cleanvar
+
+. /etc/periodic.conf 2>/dev/null
+. /etc/periodic.conf.local 2>/dev/null
+
+: "${daily_pkg_autoupgrade_enable:=NO}"
+
+case "$daily_pkg_autoupgrade_enable" in
+[Yy][Ee][Ss])
+	;;
+*)
+	exit 0
+	;;
+esac
+
+if [ ! -x /usr/local/bin/pkg ]; then
+	echo "pkg-autoupgrade: pkg(8) not found"
+	exit 1
+fi
+
+echo ""
+echo "Running pkg autoupgrade:"
+/usr/local/bin/pkg autoupgrade
+rc=$?
+
+case "$rc" in
+0)
+	echo "pkg autoupgrade completed successfully."
+	;;
+*)
+	echo "pkg autoupgrade exited with status $rc."
+	;;
+esac
+
+exit "$rc"

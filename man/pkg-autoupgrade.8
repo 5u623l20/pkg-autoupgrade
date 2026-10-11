@@ -1,0 +1,307 @@
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\" SPDX-FileCopyrightText: 2026 Cybermancer Infosec B.V.
+.Dd October 10, 2026
+.Dt PKG-AUTOUPGRADE 8
+.Os
+.Sh NAME
+.Nm pkg autoupgrade
+.Nd automated package upgrade with safety net and service restart
+.Sh SYNOPSIS
+.Nm pkg autoupgrade
+.Sh DESCRIPTION
+The
+.Nm
+command is provided by the
+.Em autoupgrade
+plugin for
+.Xr pkg 8 .
+It performs an unattended package upgrade with the following steps:
+.Bl -enum
+.It
+Refresh the catalogs of all allowed repositories.
+.It
+Build and solve an upgrade job.
+If
+.Ev AU_ALLOW_BASE_UPGRADE
+is false, repositories listed in
+.Ev AU_BASE_REPOS
+are excluded so that pkgbase (kernel, world) packages are not upgraded
+automatically.
+.It
+Before applying the job, create a safety net:
+.Bl -dash -compact
+.It
+.Em ZFS root :
+create a boot environment via
+.Xr libbe 3
+named
+.Dq Ar prefix Ns - Ns Ar YYYYMMDDTHHmmSS .
+Old auto-created environments are pruned to
+.Ev AU_BE_KEEP
+entries.
+.It
+.Em UFS root :
+if a kernel package is being upgraded and
+.Ev AU_UFS_KERNEL_BACKUP
+is true, rename
+.Pa /boot/kernel
+to
+.Pa /boot/kernel.old .
+The boot loader can boot from
+.Pa /boot/kernel.old
+via the
+.Dq Boot Older Kernel
+menu entry or
+.Xr nextboot 8 .
+.El
+.It
+Apply the upgrade job.
+.It
+Detect services that need restarting using two methods:
+.Bl -dash -compact
+.It
+.Em Direct rc ownership :
+for each script in
+.Pa /etc/rc.d/
+and
+.Pa /usr/local/etc/rc.d/ ,
+query which package owns it via
+.Xr pkgdb 8 .
+If the owning package was upgraded, the service is a candidate.
+.It
+.Em Stale mapping scan :
+enumerate running processes via
+.Xr libprocstat 3 .
+Any process with an executable VNODE mapping whose path is absent from the
+kernel name cache is using a stale binary or shared library
+(the file was replaced on disk while the process held an open inode mapping).
+If the process
+.Em comm
+name matches an rc script, that service is a candidate.
+This detects the shared-library upgrade case (e.g.\& openssl upgraded,
+nginx still maps old libssl.so).
+.El
+For each candidate service that is currently running:
+.Bl -dash -compact
+.It
+If it appears in
+.Ev AU_RESTART_SERVICES ,
+restart it via
+.Dq service Ar name restart .
+.It
+Otherwise, append a pending notice to
+.Pa /var/run/motd .
+.El
+.It
+Packages whose names match a pattern in
+.Ev AU_BLOCKLISTED_PACKAGES
+are removed from the upgrade job before it is applied.
+.It
+If a kernel package was upgraded and the system is not inside a jail:
+.Bl -dash -compact
+.It
+If
+.Ev AU_ALLOW_REBOOT
+is true and no interactive users are logged in (or
+.Ev AU_REBOOT_IF_USERS_LOGGED_IN
+is true), reboot at the time specified by
+.Ev AU_REBOOT_TIME .
+.It
+If
+.Ev AU_ALLOW_REBOOT
+is true but users are logged in and
+.Ev AU_REBOOT_IF_USERS_LOGGED_IN
+is false, defer the reboot and write a notice to
+.Pa /var/run/motd .
+.It
+If
+.Ev AU_ALLOW_REBOOT
+is false, write a reboot-required notice to
+.Pa /var/run/motd .
+.El
+.It
+If
+.Ev AU_AUTOREMOVE
+is true, remove orphaned packages via
+.Dq pkg autoremove .
+.El
+Notices written to
+.Pa /var/run/motd
+are also persisted in
+.Pa /var/db/pkg-autoupgrade/notices
+so that the
+.Em pkg_autoupgrade_motd
+.Xr rc 8
+service can re-stamp
+.Pa /var/run/motd
+after the system
+.Em motd
+service regenerates it at the next boot.
+.Sh CONFIGURATION
+The plugin reads
+.Pa /usr/local/etc/pkg/autoupgrade.conf
+in UCL format.
+The file is optional; compiled-in defaults are used when it is absent.
+.Bl -tag -width "AU_RESTART_SERVICES"
+.It Ev AU_ALLOW_BASE_UPGRADE
+Boolean.
+Allow upgrading pkgbase (FreeBSD base system) packages.
+Default:
+.Cm false .
+.It Ev AU_BASE_REPOS
+String (comma-separated).
+Repository names that contain base system packages.
+Used only when
+.Ev AU_ALLOW_BASE_UPGRADE
+is false.
+Default:
+.Cm "FreeBSD-base" .
+.It Ev AU_BE_ENABLED
+Boolean.
+Create a boot environment before each upgrade run (ZFS only).
+Default:
+.Cm true .
+.It Ev AU_BE_PREFIX
+String.
+Prefix for auto-created boot environment names.
+Default:
+.Cm "pre-autoupgrade" .
+.It Ev AU_BE_KEEP
+Integer >= 1.
+Maximum number of auto-created boot environments to retain.
+Default:
+.Cm 5 .
+.It Ev AU_UFS_KERNEL_BACKUP
+Boolean.
+On UFS roots, back up
+.Pa /boot/kernel
+to
+.Pa /boot/kernel.old
+before a kernel upgrade.
+Default:
+.Cm true .
+.It Ev AU_ALLOW_REBOOT
+Boolean.
+Automatically reboot after a kernel upgrade (not inside a jail).
+Default:
+.Cm false .
+.It Ev AU_RESTART_SERVICES
+String (comma-separated).
+Services that may be restarted automatically.
+All other affected services receive only a MOTD notice.
+Default: empty (no automatic restarts).
+.It Ev AU_ONLY_UPGRADE_VULNERABLE_PKG
+Boolean.
+When true, only packages with known vulnerabilities (per
+.Xr pkg-audit 8 )
+are upgraded.
+The vulnerability database is refreshed automatically before each run.
+If no vulnerable packages are found the run is a no-op.
+.Ev AU_ALLOW_BASE_UPGRADE
+and
+.Ev AU_BASE_REPOS
+are still respected.
+Default:
+.Cm false .
+.It Ev AU_BLOCKLISTED_PACKAGES
+String (comma-separated POSIX extended regular expressions).
+Package names matching any of these patterns are excluded from the upgrade job.
+Patterns are anchored only if the expression itself includes
+.Sq ^
+or
+.Sq $ .
+To permanently pin a package, prefer
+.Xr pkg-lock 8 ;
+this setting applies to automated runs only and user-locked packages are
+always respected regardless.
+Default: empty (no packages excluded).
+.It Ev AU_AUTOREMOVE
+Boolean.
+Run
+.Dq pkg autoremove
+after a successful upgrade to remove orphaned packages.
+Default:
+.Cm false .
+.It Ev AU_REBOOT_TIME
+String.
+When
+.Ev AU_ALLOW_REBOOT
+is true, controls when the system reboots after a kernel upgrade.
+.Cm now
+reboots immediately via
+.Xr reboot 2 .
+An
+.Cm HH:MM
+value schedules the reboot via
+.Xr shutdown 8
+so that logged-in users receive advance notice.
+Default:
+.Cm "now" .
+.It Ev AU_REBOOT_IF_USERS_LOGGED_IN
+Boolean.
+When
+.Ev AU_ALLOW_REBOOT
+is true and interactive users are logged in, controls whether the reboot
+proceeds anyway.
+When false (the default), the reboot is deferred and a MOTD notice is written
+instead so that no active session is dropped unexpectedly.
+Default:
+.Cm false .
+.It Ev AU_MAIL_TO
+String.
+Email address for post-upgrade reports.
+Requires a working MTA with a
+.Xr sendmail 8 Ns -compatible
+interface at
+.Pa /usr/sbin/sendmail .
+Empty (the default) disables email notifications.
+.It Ev AU_MAIL_REPORT
+String.
+Controls when email reports are sent.
+.Cm always
+sends after every run.
+.Cm on-change
+(the default) sends when at least one package was upgraded.
+.Cm on-error
+sends only when an error occurred.
+Default:
+.Cm "on-change" .
+.El
+.Sh FILES
+.Bl -tag -width "/usr/local/etc/pkg/autoupgrade.conf.sample"
+.It Pa /usr/local/etc/pkg/autoupgrade.conf
+Plugin configuration (UCL).
+.It Pa /usr/local/lib/pkg/autoupgrade.so
+Plugin shared object loaded by
+.Xr pkg 8 .
+.It Pa /var/run/motd
+Pending notices are written here in a delimited section.
+.It Pa /var/db/pkg-autoupgrade/notices
+Persistent copy of pending notices; repopulated at boot.
+.El
+.Sh PERIODIC INTEGRATION
+Copy the sample periodic configuration and enable the daily run:
+.Bd -literal -offset indent
+# In /etc/periodic.conf:
+daily_pkg_autoupgrade_enable="YES"
+.Ed
+.Pp
+The periodic script is installed at
+.Pa /usr/local/etc/periodic/daily/500.pkg-autoupgrade .
+.Sh ENABLING THE PLUGIN
+Add the plugin to
+.Pa /usr/local/etc/pkg.conf :
+.Bd -literal -offset indent
+PLUGINS [ "autoupgrade" ];
+.Ed
+.Sh SEE ALSO
+.Xr pkg 8 ,
+.Xr pkg.conf 5 ,
+.Xr libbe 3 ,
+.Xr periodic 8 ,
+.Xr service 8 ,
+.Xr nextboot 8
+.Sh HISTORY
+The
+.Nm
+plugin first appeared in the pkg-autoupgrade project, 2026.

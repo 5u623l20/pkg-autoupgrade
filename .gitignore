@@ -1,0 +1,12 @@
+# BSD make build artifacts
+*.pico
+*.pieo
+*.so
+*.so.debug
+*.so.full
+*.gz
+.depend
+.depend.*
+
+# clang dependency files
+*.d
