@@ -1,0 +1,62 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-2-Clause
+# SPDX-FileCopyrightText: 2026 Cybermancer Infosec B.V.
+#
+# pkg-autoupgrade-motd - re-stamp /var/run/motd with pending notices after
+# the system motd script regenerates it at boot.
+#
+# PROVIDE: pkg_autoupgrade_motd
+# REQUIRE: motd
+# BEFORE:  LOGIN
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="pkg_autoupgrade_motd"
+rcvar="pkg_autoupgrade_motd_enable"
+start_cmd="pkg_autoupgrade_motd_start"
+stop_cmd=":"
+
+: "${pkg_autoupgrade_motd_enable:=YES}"
+
+pkg_autoupgrade_motd_start()
+{
+	state_file="/var/db/pkg-autoupgrade/notices"
+	motd_file="/var/run/motd"
+	begin_marker="# --- pkg-autoupgrade begin ---"
+	end_marker="# --- pkg-autoupgrade end ---"
+	state_tmp="${state_file}.tmp"
+	motd_tmp="${motd_file}.au.tmp"
+
+	# If our private reboot-pending flag exists, a pkg-autoupgrade kernel
+	# upgrade requested this reboot.  We just booted, so the reboot has
+	# taken place: strip the stale notice and remove the flag.
+	if [ -f "/var/db/pkg-autoupgrade/reboot-pending" ]; then
+		if [ -f "$state_file" ]; then
+			grep -v '^System reboot required:' "$state_file" \
+			    > "$state_tmp" 2>/dev/null || : > "$state_tmp"
+			mv "$state_tmp" "$state_file"
+		fi
+		rm -f "/var/db/pkg-autoupgrade/reboot-pending"
+	fi
+
+	# Remove any existing autoupgrade section from the MOTD unconditionally
+	# so a clean slate is guaranteed even when the state file is now empty.
+	awk -v begin="$begin_marker" -v end="$end_marker" '
+		$0 == begin { skip = 1; next }
+		$0 == end   { skip = 0; next }
+		!skip       { print }
+	' "$motd_file" > "$motd_tmp" 2>/dev/null || cp "$motd_file" "$motd_tmp"
+
+	# Only re-append the section if there are remaining notices.
+	if [ -s "$state_file" ]; then
+		printf '%s\n' "$begin_marker" >> "$motd_tmp"
+		cat "$state_file"             >> "$motd_tmp"
+		printf '%s\n' "$end_marker"   >> "$motd_tmp"
+	fi
+
+	mv "$motd_tmp" "$motd_file"
+}
+
+load_rc_config $name
+run_rc_command "$1"
